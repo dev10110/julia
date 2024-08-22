@@ -571,6 +571,13 @@ end
     @test_broken ismissing(norm(x, 0))
 end
 
+@testset "avoid stackoverflow of norm on AbstractChar" begin
+    @test_throws ArgumentError norm('a')
+    @test_throws ArgumentError norm(['a', 'b'])
+    @test_throws ArgumentError norm("s")
+    @test_throws ArgumentError norm(["s", "t"])
+end
+
 @testset "peakflops" begin
     @test LinearAlgebra.peakflops(1024, eltype=Float32, ntrials=2) > 0
 end
@@ -647,12 +654,54 @@ end
 
 @testset "copytrito!" begin
     n = 10
-    for A in (rand(n, n), rand(Int8, n, n)), uplo in ('L', 'U')
-        for AA in (A, view(A, reverse.(axes(A))...))
-            for B in (zeros(n, n), zeros(n+1, n+2))
-                copytrito!(B, AA, uplo)
+    @testset "square" begin
+        for A in (rand(n, n), rand(Int8, n, n)), uplo in ('L', 'U')
+            for AA in (A, view(A, reverse.(axes(A))...))
                 C = uplo == 'L' ? tril(AA) : triu(AA)
-                @test view(B, 1:n, 1:n) == C
+                for B in (zeros(n, n), zeros(n+1, n+2))
+                    copytrito!(B, AA, uplo)
+                    @test view(B, 1:n, 1:n) == C
+                end
+            end
+        end
+    end
+    @testset "wide" begin
+        for A in (rand(n, 2n), rand(Int8, n, 2n))
+            for AA in (A, view(A, reverse.(axes(A))...))
+                C = tril(AA)
+                for (M, N) in ((n, n), (n+1, n), (n, n+1), (n+1, n+1))
+                    B = zeros(M, N)
+                    copytrito!(B, AA, 'L')
+                    @test view(B, 1:n, 1:n) == view(C, 1:n, 1:n)
+                end
+                @test_throws DimensionMismatch copytrito!(zeros(n-1, 2n), AA, 'L')
+                C = triu(AA)
+                for (M, N) in ((n, 2n), (n+1, 2n), (n, 2n+1), (n+1, 2n+1))
+                    B = zeros(M, N)
+                    copytrito!(B, AA, 'U')
+                    @test view(B, 1:n, 1:2n) == view(C, 1:n, 1:2n)
+                end
+                @test_throws DimensionMismatch copytrito!(zeros(n+1, 2n-1), AA, 'U')
+            end
+        end
+    end
+    @testset "tall" begin
+        for A in (rand(2n, n), rand(Int8, 2n, n))
+            for AA in (A, view(A, reverse.(axes(A))...))
+                C = triu(AA)
+                for (M, N) in ((n, n), (n+1, n), (n, n+1), (n+1, n+1))
+                    B = zeros(M, N)
+                    copytrito!(B, AA, 'U')
+                    @test view(B, 1:n, 1:n) == view(C, 1:n, 1:n)
+                end
+                @test_throws DimensionMismatch copytrito!(zeros(n-1, n+1), AA, 'U')
+                C = tril(AA)
+                for (M, N) in ((2n, n), (2n, n+1), (2n+1, n), (2n+1, n+1))
+                    B = zeros(M, N)
+                    copytrito!(B, AA, 'L')
+                    @test view(B, 1:2n, 1:n) == view(C, 1:2n, 1:n)
+                end
+                @test_throws DimensionMismatch copytrito!(zeros(n-1, n+1), AA, 'L')
             end
         end
     end

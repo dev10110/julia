@@ -2,7 +2,8 @@
 
 Core.PhiNode() = Core.PhiNode(Int32[], Any[])
 
-isterminator(@nospecialize(stmt)) = isa(stmt, GotoNode) || isa(stmt, GotoIfNot) || isa(stmt, ReturnNode) || isa(stmt, EnterNode) || isexpr(stmt, :leave)
+isterminator(@nospecialize(stmt)) = isa(stmt, GotoNode) || isa(stmt, GotoIfNot) ||
+    isa(stmt, ReturnNode) || isa(stmt, EnterNode) || isexpr(stmt, :leave)
 
 struct CFG
     blocks::Vector{BasicBlock}
@@ -1018,7 +1019,8 @@ function did_just_finish_bb(compact)
     result_idx = compact.result_idx
     result_bbs = compact.cfg_transform.result_bbs
     (compact.active_result_bb == length(result_bbs) + 1) ||
-    result_idx == first(result_bbs[compact.active_result_bb].stmts)
+    (result_idx == first(result_bbs[compact.active_result_bb].stmts) &&
+     compact.active_result_bb != 1)
 end
 
 function maybe_reopen_bb!(compact)

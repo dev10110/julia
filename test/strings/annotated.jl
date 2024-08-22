@@ -64,6 +64,9 @@ end
 @testset "AnnotatedChar" begin
     chr = Base.AnnotatedChar('c')
     @test chr == Base.AnnotatedChar(chr.char, Pair{Symbol, Any}[])
+    @test uppercase(chr) == Base.AnnotatedChar('C')
+    @test titlecase(chr) == Base.AnnotatedChar('C')
+    @test lowercase(Base.AnnotatedChar('C')) == chr
     str = Base.AnnotatedString("hmm", [(1:1, :attr => "h0h0"),
                                (1:2, :attr => "h0m1"),
                                (2:3, :attr => "m1m2")])
@@ -101,6 +104,8 @@ end
                      [(1:4, :label => 5),
                       (5:5, :label => 2),
                       (6:9, :label => 5)])
+    @test join((String(str1), str1), ' ') ==
+        Base.AnnotatedString("test test", [(6:9, :label => 5)])
     @test repeat(str1, 2) == Base.AnnotatedString("testtest", [(1:8, :label => 5)])
     @test repeat(str2, 2) == Base.AnnotatedString("casecase", [(2:3, :label => "oomph"),
                                                        (6:7, :label => "oomph")])
@@ -212,6 +217,12 @@ end
     let aio2 = copy(aio) # ...and any subsequent annotations after a matching run can just be copied over.
         @test write(aio2, Base.AnnotatedChar('c', [:b => 2, :c => 3, :d => 4])) == 1
         @test Base.annotations(aio2) == [(1:2, :a => 1), (1:3, :b => 2), (3:3, :c => 3), (3:3, :d => 4)]
+    end
+    let aio2 = Base.AnnotatedIOBuffer()
+        @test write(aio2, Base.AnnotatedChar('a', [:b => 1])) == 1
+        @test write(aio2, Base.AnnotatedChar('b', [:a => 1, :b => 1])) == 1
+        @test read(seekstart(aio2), Base.AnnotatedString) ==
+            Base.AnnotatedString("ab", [(1:1, :b => 1), (2:2, :a => 1), (2:2, :b => 1)])
     end
     # Working through an IOContext
     aio = Base.AnnotatedIOBuffer()

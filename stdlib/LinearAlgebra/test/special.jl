@@ -3,7 +3,7 @@
 module TestSpecial
 
 using Test, LinearAlgebra, Random
-using LinearAlgebra: rmul!
+using LinearAlgebra: rmul!, BandIndex
 
 n= 10 #Size of matrix to test
 Random.seed!(1)
@@ -128,6 +128,15 @@ Random.seed!(1)
         for M in (D, Bu, Bl, Tri, Sym)
             @test Matrix(M) == zeros(TypeWithZero, 3, 3)
         end
+
+        mutable struct MTypeWithZero end
+        Base.convert(::Type{MTypeWithZero}, ::TypeWithoutZero) = MTypeWithZero()
+        Base.convert(::Type{MTypeWithZero}, ::TypeWithZero) = MTypeWithZero()
+        Base.zero(x::MTypeWithZero) = zero(typeof(x))
+        Base.zero(::Type{MTypeWithZero}) = MTypeWithZero()
+        U = UpperTriangular(Symmetric(fill(TypeWithoutZero(), 2, 2)))
+        M = Matrix{MTypeWithZero}(U)
+        @test all(x -> x isa MTypeWithZero, M)
     end
 end
 
@@ -546,8 +555,8 @@ end
     @testset "from Diagonal" begin
         D = Diagonal(d)
         @testset "to Bidiagonal" begin
-            BU = Bidiagonal(zero(d), oneunit.(du), :U)
-            BL = Bidiagonal(zero(d), oneunit.(dl), :L)
+            BU = Bidiagonal(similar(d, BigInt), similar(du, BigInt), :U)
+            BL = Bidiagonal(similar(d, BigInt), similar(dl, BigInt), :L)
             for B in (BL, BU)
                 copyto!(B, D)
                 @test B == D
@@ -564,7 +573,7 @@ end
             end
         end
         @testset "to Tridiagonal" begin
-            T = Tridiagonal(oneunit.(dl), zero(d), oneunit.(du))
+            T = Tridiagonal(similar(dl, BigInt), similar(d, BigInt), similar(du, BigInt))
             copyto!(T, D)
             @test T == D
 
@@ -577,8 +586,8 @@ end
             end
         end
         @testset "to SymTridiagonal" begin
-            for du2 in (oneunit.(du), oneunit.(d))
-                S = SymTridiagonal(zero(d), du2)
+            for du2 in (similar(du, BigInt), similar(d, BigInt))
+                S = SymTridiagonal(similar(d), du2)
                 copyto!(S, D)
                 @test S == D
             end
@@ -621,13 +630,14 @@ end
             end
         end
         @testset "to Tridiagonal" begin
-            T = Tridiagonal(oneunit.(dl), zero(d), oneunit.(du))
+            T = Tridiagonal(similar(dl, BigInt), similar(d, BigInt), similar(du, BigInt))
             for B in (BL, BU, BLones, BUones)
                 copyto!(T, B)
                 @test T == B
             end
 
             @testset "mismatched size" begin
+                T = Tridiagonal(oneunit.(dl), zero(d), oneunit.(du))
                 for uplo in (:L, :U)
                     T .= 0
                     copyto!(T, Bidiagonal([1], Int[], uplo))
@@ -638,8 +648,8 @@ end
             end
         end
         @testset "to SymTridiagonal" begin
-            for du2 in (oneunit.(du), oneunit.(d))
-                S = SymTridiagonal(zero(d), du2)
+            for du2 in (similar(du, BigInt), similar(d, BigInt))
+                S = SymTridiagonal(similar(d, BigInt), du2)
                 for B in (BL, BU)
                     copyto!(S, B)
                     @test S == B
@@ -760,6 +770,19 @@ end
                 end
             end
         end
+    end
+end
+
+@testset "BandIndex indexing" begin
+    for D in (Diagonal(1:3), Bidiagonal(1:3, 2:3, :U), Bidiagonal(1:3, 2:3, :L),
+                Tridiagonal(2:3, 1:3, 1:2), SymTridiagonal(1:3, 2:3))
+        M = Matrix(D)
+        for band in -size(D,1)+1:size(D,1)-1
+            for idx in 1:size(D,1)-abs(band)
+                @test D[BandIndex(band, idx)] == M[BandIndex(band, idx)]
+            end
+        end
+        @test_throws BoundsError D[BandIndex(size(D,1),1)]
     end
 end
 

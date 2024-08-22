@@ -5,13 +5,16 @@ public
     Checked,
     Filesystem,
     Order,
+    ScopedValues,
     Sort,
 
 # Types
     AbstractLock,
+    AbstractPipe,
     AsyncCondition,
     CodeUnits,
     Event,
+    Fix,
     Fix1,
     Fix2,
     Generator,
@@ -43,6 +46,7 @@ public
     split_rest,
     tail,
     checked_length,
+    elsize,
 
 # Loading
     DL_LOAD_PATH,
@@ -63,7 +67,7 @@ public
     ispublic,
     remove_linenums!,
 
-# Opperators
+# Operators
     operator_associativity,
     operator_precedence,
     isbinaryoperator,
@@ -109,4 +113,5 @@ public
 # misc
     notnothing,
     runtests,
-    text_colors
+    text_colors,
+    depwarn

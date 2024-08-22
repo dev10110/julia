@@ -304,9 +304,10 @@ function show_progress(io::IO, p::MiniProgressBar; termwidth=nothing, carriagere
     to_print = sprint(; context=io) do io
         print(io, " "^p.indent)
         printstyled(io, p.header, color=p.color, bold=true)
-        print(io, " [")
-        print(io, "="^n_filled, ">")
-        print(io, " "^n_left, "]  ", )
+        print(io, " ")
+        printstyled(io, "━"^n_filled; color=p.color)
+        printstyled(io, perc >= 95 ? "━" : "╸"; color=p.color)
+        printstyled(io, "━"^n_left, " "; color=:light_black)
         print(io, progress_text)
         carriagereturn && print(io, "\r")
     end
@@ -385,10 +386,6 @@ function precompilepkgs(pkgs::Vector{String}=String[];
     hascolor = get(io, :color, false)::Bool
     color_string(cstr::String, col::Union{Int64, Symbol}) = _color_string(cstr, col, hascolor)
 
-    direct_deps = [
-        Base.PkgId(uuid, name)
-        for (name, uuid) in env.project_deps if !Base.in_sysimage(Base.PkgId(uuid, name))
-    ]
     stale_cache = Dict{StaleCacheKey, Bool}()
     exts = Dict{Base.PkgId, String}() # ext -> parent
     # make a flat map of each dep and its direct deps
@@ -427,6 +424,14 @@ function precompilepkgs(pkgs::Vector{String}=String[];
             pkg_exts_map[pkg] = collect(keys(pkg_exts))
         end
     end
+
+    direct_deps = [
+        Base.PkgId(uuid, name)
+        for (name, uuid) in env.project_deps if !Base.in_sysimage(Base.PkgId(uuid, name))
+    ]
+
+    # consider exts of direct deps to be direct deps so that errors are reported
+    append!(direct_deps, keys(filter(d->last(d) in keys(env.project_deps), exts)))
 
     # An extension effectively depends on another extension if it has all the the
     # dependencies of that other extension
@@ -706,7 +711,7 @@ function precompilepkgs(pkgs::Vector{String}=String[];
             while !printloop_should_exit
                 lock(print_lock) do
                     term_size = Base.displaysize(io)::Tuple{Int,Int}
-                    num_deps_show = term_size[1] - 3
+                    num_deps_show = max(term_size[1] - 3, 2) # show at least 2 deps
                     pkg_queue_show = if !interrupted_or_done.set && length(pkg_queue) > num_deps_show
                         last(pkg_queue, num_deps_show)
                     else
@@ -893,6 +898,7 @@ function precompilepkgs(pkgs::Vector{String}=String[];
                     length(tasks) == 1 && notify(interrupted_or_done)
                 end
             end
+            Base.errormonitor(task) # interrupts are handled separately so ok to watch for other errors like this
             push!(tasks, task)
         end
     end
